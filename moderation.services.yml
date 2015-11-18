@@ -7,3 +7,7 @@ services:
   moderation.node_moderation:
     class: Drupal\moderation\NodeModeration
     arguments: ['@entity_type.manager']
+  moderation.route_subscriber:
+    class: Drupal\moderation\Routing\RouteSubscriber
+    tags:
+      - { name: event_subscriber }
