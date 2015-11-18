@@ -1,0 +1,25 @@
+<?php
+/**
+ * @file
+ * Provides moderation of revisionable entities.
+ */
+
+use \Drupal\node\NodeInterface;
+
+/**
+ * Implements hook_entity_type_alter().
+ *
+ * @todo: support other revisionable entities.
+ */
+function moderation_entity_type_alter(array &$entity_types) {
+  if (isset($entity_types['node'])) {
+    /** @var \Drupal\Core\Entity\ContentEntityTypeInterface $entity_type */
+    $entity_type = $entity_types['node'];
+
+    // Swap in a different form handler to ensure the proper version is loaded.
+    $handlers = $entity_type->getHandlerClasses();
+    $handlers['form']['default'] = 'Drupal\moderation\Form\NodeForm';
+    $handlers['form']['edit'] = $handlers['form']['default'];
+    $entity_type->setHandlerClass('form', $handlers['form']);
+  }
+}

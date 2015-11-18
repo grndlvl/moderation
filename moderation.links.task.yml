@@ -1,0 +1,4 @@
+node.draft:
+  title: Draft
+  route_name: node.draft
+  base_route: entity.node.canonical

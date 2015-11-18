@@ -1,0 +1,7 @@
+node.draft:
+  path: '/node/{node}/draft'
+  defaults:
+    _controller: 'Drupal\moderation\Controller\DraftController::show'
+    _title_callback: 'Drupal\moderation\Controller\DraftController::draftPageTitle'
+  requirements:
+    _access_node_draft: 'view'
