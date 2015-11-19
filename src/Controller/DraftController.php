@@ -29,6 +29,12 @@ class DraftController extends NodeController {
    */
   protected $moderation;
 
+  protected $revisionPermissions = array('revert' => FALSE, 'delete' => FALSE);
+
+  protected $hasTranslations = FALSE;
+
+  protected $draftRevision;
+
   /**
    * Constructs a NodeController object.
    *
@@ -83,15 +89,17 @@ class DraftController extends NodeController {
    */
   public function revisionOverview(NodeInterface $node) {
     $languages = $node->getTranslationLanguages();
-    $has_translations = (count($languages) > 1);
+    $this->hasTranslations = (count($languages) > 1);
+    $this->draftRevision = $this->moderation->getDraftRevisionId($node);
+
     $langcode = $this->languageManager()->getCurrentLanguage(LanguageInterface::TYPE_CONTENT)->getId();
     $langname = $this->languageManager()->getLanguageName($langcode);
 
     return array(
-      '#title' => $has_translations ? $this->t('@langname revisions for %title', ['@langname' => $langname, '%title' => $node->label()]) : $this->t('Revisions for %title', ['%title' => $node->label()]),
+      '#title' => $this->hasTranslations ? $this->t('@langname revisions for %title', ['@langname' => $langname, '%title' => $node->label()]) : $this->t('Revisions for %title', ['%title' => $node->label()]),
       'node_revisions_table' => array(
         '#theme' => 'table',
-        '#rows' => $this->getRevisionRows($node, $languages, $has_translations, $langcode, $langname),
+        '#rows' => $this->getRevisionRows($node, $langcode),
         '#header' => $this->getRevisionHeaders(),
         '#attached' => array(
           'library' => array('node/drupal.node.admin'),
@@ -104,36 +112,51 @@ class DraftController extends NodeController {
     return array($this->t('Revision'), $this->t('State'), $this->t('Operations'));
   }
 
-  protected function getRevisionRows(NodeInterface $node, $languages, $has_translations, $langcode, $langname) {
+  protected function getRevisionRows(NodeInterface $node, $langcode) {
     $rows = array();
     $account = $this->currentUser();
-    $node_storage = $this->entityManager()->getStorage('node');
-    $type = $node->getType();
+    $this->setRevisionPermissions($node, $account);
 
-    $revert_permission = (($account->hasPermission("revert $type revisions") || $account->hasPermission('revert all revisions') || $account->hasPermission('administer nodes')) && $node->access('update'));
-    $delete_permission =  (($account->hasPermission("delete $type revisions") || $account->hasPermission('delete all revisions') || $account->hasPermission('administer nodes')) && $node->access('delete'));
-
-    $latest_revision = TRUE;
-
-    $vids = $node_storage->revisionIds($node);
+    $vids = $this->entityManager()->getStorage('node')->revisionIds($node);
     foreach (array_reverse($vids) as $vid) {
-      $rows[] = $this->getRevisionRow($vid, $langcode, $has_translations, $node_storage, $revert_permission, $delete_permission, $node, $latest_revision);
+      $rows[] = $this->getRevisionRow($node, $vid, $langcode);
     }
     return $rows;
   }
 
-  protected function getRevisionRow($vid, $langcode, $has_translations, $node_storage, $revert_permission, $delete_permission, $node, &$latest_revision) {
+  protected function setRevisionPermissions(NodeInterface $node, $account) {
+    $type = $node->getType();
+    $this->revisionPermissions = array(
+      'revert' => (($account->hasPermission("revert $type revisions") || $account->hasPermission('revert all revisions') || $account->hasPermission('administer nodes')) && $node->access('update')),
+      'delete' => (($account->hasPermission("delete $type revisions") || $account->hasPermission('delete all revisions') || $account->hasPermission('administer nodes')) && $node->access('delete')),
+    );
+  }
+
+  protected function getRevisionRow(NodeInterface $node, $vid, $langcode) {
+    $row = [];
     /** @var \Drupal\node\NodeInterface $revision */
-    $revision = $node_storage->loadRevision($vid);
+    $revision = $this->entityManager()->getStorage('node')->loadRevision($vid);
     if ($revision->hasTranslation($langcode) && $revision->getTranslation($langcode)->isRevisionTranslationAffected()) {
-      $row[] = $this->getRevisionColumnRevision($revision, $node, $vid);
-      $row[] = $this->getRevisionColumnStatus();
-      $row[] = $this->getRevisionColumnOperations($latest_revision, $node, $has_translations, $vid, $langcode, $revert_permission, $delete_permission);
+      $row_class = $this->getRevisionRowClass($revision);
+      $row[] = $this->getRevisionColumnRevision($revision, $node, $vid) + $row_class;
+      $row[] = $this->getRevisionColumnStatus($revision) + $row_class;
+      $row[] = $this->getRevisionColumnOperations($revision, $node, $langcode) + $row_class;
     }
     return $row;
   }
 
-  protected function getRevisionColumnRevision($revision, $node, $vid) {
+  protected function getRevisionRowClass($revision) {
+    $row_class = [];
+    if ($this->draftRevision === $revision->getRevisionID()) {
+      $row_class = ['class' => 'revision-current'];
+    }
+    elseif ($revision->isDefaultRevision()) {
+      $row_class = ['class' => 'color-success'];
+    }
+    return $row_class;
+  }
+
+  protected function getRevisionColumnRevision($revision, $node) {
     $username = [
       '#theme' => 'username',
       '#account' => $revision->getRevisionAuthor(),
@@ -142,13 +165,20 @@ class DraftController extends NodeController {
     // Use revision link to link to revisions that are not active.
     $date = $this->dateFormatter->format($revision->revision_timestamp->value, 'short');
     if ($vid != $node->getRevisionId()) {
-      $link = $this->l($date, new Url('entity.node.revision', ['node' => $node->id(), 'node_revision' => $vid]));
+      $link = $this->l($date, new Url('entity.node.revision', ['node' => $node->id(), 'node_revision' => $revision->getRevisionId()]));
     }
     else {
       $link = $node->link($date);
     }
 
-    $column = [
+    $column = $this->buildRevisionColumnRevision($revision, $link, $username);
+    // @todo Simplify once https://www.drupal.org/node/2334319 lands.
+    $this->renderer->addCacheableDependency($column['data'], $username);
+    return $column;
+  }
+
+  protected function buildRevisionColumnRevision($revision, $link, $username) {
+    return [
       'data' => [
         '#type' => 'inline_template',
         '#template' => '{% trans %}{{ date }} by {{ username }}{% endtrans %}{% if message %}<p class="revision-log">{{ message }}</p>{% endif %}',
@@ -159,51 +189,71 @@ class DraftController extends NodeController {
         ],
       ],
     ];
-    // @todo Simplify once https://www.drupal.org/node/2334319 lands.
-    $this->renderer->addCacheableDependency($column['data'], $username);
-    return $column;
   }
 
-  protected function getRevisionColumnStatus() {
-    return 'moo';
+  protected function getRevisionColumnStatus($revision) {
+    if ($this->draftRevision === $revision->getRevisionID()) {
+      $text = $this->t('Draft');
+    }
+    elseif ($revision->isDefaultRevision()) {
+      $text = $this->t('Current');
+    }
+    elseif ($revision->isPublished()) {
+      $text = $this->t('Archived from published');
+    }
+
+    return [
+      'data' => [
+        '#markup' => $text,
+      ],
+    ];
   }
 
-  protected function getRevisionColumnOperations(&$latest_revision, $node, $has_translations, $vid, $langcode, $revert_permission, $delete_permission) {
+  protected function getRevisionColumnOperations($revision, $node, $langcode) {
+    $vid = $revision->getRevisionId();
     $column = array();
-    if ($latest_revision) {
-      $column = [
-        'data' => [
-          '#prefix' => '<em>',
-          '#markup' => $this->t('Current revision'),
-          '#suffix' => '</em>',
-        ],
-      ];
-      $latest_revision = FALSE;
-    }
-    else {
-      $links = [];
-      if ($revert_permission) {
-        $links['revert'] = [
-          'title' => $this->t('Revert'),
-          'url' => $has_translations ?
-            Url::fromRoute('node.revision_revert_translation_confirm', ['node' => $node->id(), 'node_revision' => $vid, 'langcode' => $langcode]) :
-            Url::fromRoute('node.revision_revert_confirm', ['node' => $node->id(), 'node_revision' => $vid]),
-        ];
-      }
 
-      if ($delete_permission) {
-        $links['delete'] = [
-          'title' => $this->t('Delete'),
-          'url' => Url::fromRoute('node.revision_delete_confirm', ['node' => $node->id(), 'node_revision' => $vid]),
-        ];
-      }
-
-      $column = array('data' => array(
-        '#type' => 'operations',
-        '#links' => $links,
-      ));
+    $links = [];
+    if ($vid === $this->draftRevision || (!$this->draftRevision && $vid === $node->getRevisionId())) {
+      $links['edit'] = $this->buildREvisionColumnOperationEdit($node);
     }
+    elseif ($this->revisionPermissions['revert']) {
+      $links['revert'] = $this->buildRevisionColumnOperationsRevert($revision, $node, $langcode);
+    }
+
+    if ($this->revisionPermissions['delete']) {
+      $links['delete'] = $this->buildRevisionColumnOperationsDelete($revision, $node, $langcode);
+    }
+
+    $column = array('data' => array(
+      '#type' => 'operations',
+      '#links' => $links,
+    ));
 
     return $column;
   }
+
+  protected function buildREvisionColumnOperationEdit($node) {
+    return [
+      'title' => $this->t('Edit'),
+      'url' => Url::fromRoute('entity.node.edit_form', ['node' => $node->id()]),
+    ];
+  }
+
+  protected function buildRevisionColumnOperationsRevert($revision, $node, $langcode) {
+    return [
+      'title' => $this->t('Set as draft'),
+      'url' => $this->hasTranslations ?
+        Url::fromRoute('node.revision_revert_translation_confirm', ['node' => $node->id(), 'node_revision' => $revision->getRevisionId(), 'langcode' => $langcode]) :
+        Url::fromRoute('node.revision_revert_confirm', ['node' => $node->id(), 'node_revision' => $revision->getRevisionId()]),
+    ];
+  }
+
+  protected function buildRevisionColumnOperationsDelete($revision, $node, $langcode) {
+    return [
+      'title' => $this->t('Delete'),
+      'url' => Url::fromRoute('node.revision_delete_confirm', ['node' => $node->id(), 'node_revision' => $revision->getRevisionId()]),
+    ];
+  }
+
 }

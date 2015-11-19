@@ -24,6 +24,11 @@ class RouteSubscriber extends RouteSubscriberBase {
         '_controller' => '\Drupal\moderation\Controller\DraftController::revisionOverview',
       ));
     }
+    if ($route = $collection->get('node.revision_revert_confirm')) {
+      $route->setDefaults(array(
+        '_form' => '\Drupal\moderation\Form\NodeRevisionRevertForm'
+      ));
+    }
   }
 
 }
