@@ -57,7 +57,7 @@ class ModerationNodeTest extends NodeTestBase {
 
     // Set up users.
     $this->adminUser = $this->drupalCreateUser(['bypass node access', 'administer nodes']);
-    $this->normalUser = $this->drupalCreateUser(['create article content', 'edit own article content']);
+    $this->normalUser = $this->drupalCreateUser(['create article content', 'edit own article content', 'view all revisions']);
   }
 
   /**
@@ -153,7 +153,7 @@ class ModerationNodeTest extends NodeTestBase {
 
     // Edit the node.
     $this->drupalGet('node/' . $node->id() . '/edit');
-    $this->assertButtons([t('Save as draft')], FALSE, t('Save as draft'));
+    $this->assertButtons([t('Save as draft')], FALSE);
     $edit = [
       'title[0][value]' => 'Draft one title',
       'body[0][value]' => 'Draft one body',

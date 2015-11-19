@@ -1,0 +1,13 @@
+steps:
+  - name: Install drush-master for d8
+    command: 'composer global require drush/drush:dev-master ; cd /usr/local/bin ; mv drush drush7 ; ln -s $HOME/.composer/vendor/bin/drush drush'
+  - name: Import the Drupal codebase
+    command: 'drush dl drupal-8.0.0 --destination=/var/www --drupal-project-rename=html'
+  - name: Run install
+    command: "drush --root=/var/www/html site-install standard --db-url='mysqli://root:strongpassword@localhost/moderation'"
+  - name: Fix file permissions
+    command: 'chown www-data:www-data /var/www/html/sites/default/files'
+  - name: Copy code in place
+    command: 'cp -r $SRC_DIR /var/www/html/modules/moderation'
+  - name: Enable moderation module
+    command: 'drush --root=/var/www/html en moderation'
