@@ -235,7 +235,7 @@ class DraftController extends NodeController {
 
     // Use revision link to link to revisions that are not active.
     $date = $this->dateFormatter->format($revision->revision_timestamp->value, 'short');
-    if ($vid != $node->getRevisionId()) {
+    if ($revision->id() != $node->getRevisionId()) {
       $link = $this->l($date, new Url('entity.node.revision', ['node' => $node->id(), 'node_revision' => $revision->getRevisionId()]));
     }
     else {

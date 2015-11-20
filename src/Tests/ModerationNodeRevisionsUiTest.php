@@ -33,6 +33,8 @@ class ModerationNodeRevisionsUiTest extends NodeTestBase {
   protected function setUp() {
     parent::setUp();
 
+    $this->drupalPlaceBlock('local_tasks_block');
+
     // Use revisions by default.
     $this->nodeType = NodeType::load('article');
     $this->nodeType->setNewRevision(TRUE);
@@ -46,6 +48,7 @@ class ModerationNodeRevisionsUiTest extends NodeTestBase {
 
     $this->editor = $this->drupalCreateUser([
       'administer nodes',
+      'create article content',
       'edit any article content',
       'view article revisions',
       'access user profiles',
@@ -61,13 +64,23 @@ class ModerationNodeRevisionsUiTest extends NodeTestBase {
     $edit = array();
     $edit['title[0][value]'] = $this->randomMachineName(8);
     $edit['body[0][value]'] = $this->randomMachineName(16);
-    $this->drupalPostForm('node/add/article', $edit, t('Save'));
+    $this->drupalPostForm('node/add/article', $edit, t('Save and publish'));
 
     $node = $this->drupalGetNodeByTitle($edit['title[0][value]']);
     $edit['title[0][value]'] = $this->randomMachineName(8);
     $this->drupalPostForm('node/' . $node->id() . '/edit', $edit, t('Save as draft'));
 
-    $nid_with_revisions = $node->id();
+    $this->nid_with_revisions = $node->id();
+  }
+
+  function testRevisionsLinkIsOnNodeViewPage() {
+    $this->drupalGet('node/' . $this->nid_with_revisions);
+    $this->assertLink(t('Revisions'));
+  }
+
+  function testRevisionsPageIsAccessible() {
+    $this->drupalGet('node/' . $this->nid_with_revisions . '/revisions');
+    $this->assertResponse(200, t('Revisions overview page is available.'));
   }
 
 }
