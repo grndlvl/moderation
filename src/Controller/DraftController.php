@@ -12,6 +12,7 @@ use Drupal\Core\Language\LanguageInterface;
 use Drupal\Core\Render\RendererInterface;
 use Drupal\node\Controller\NodeController;
 use Drupal\node\NodeInterface;
+use Drupal\Core\Session\AccountProxyInterface;
 use Drupal\Component\Utility\Xss;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
@@ -29,10 +30,22 @@ class DraftController extends NodeController {
    */
   protected $moderation;
 
+  /**
+   * Stores the current users revision permissions while building the revisions
+   * overview table.
+   */
   protected $revisionPermissions = array('revert' => FALSE, 'delete' => FALSE);
 
+  /**
+   * Determines if the current revision has translations while building the
+   * revisions overview table.
+   */
   protected $hasTranslations = FALSE;
 
+  /**
+   * Stores the current draft revision while building the revisions overview
+   * Table.
+   */
   protected $draftRevision;
 
   /**
@@ -79,13 +92,7 @@ class DraftController extends NodeController {
   }
 
   /**
-   * Generates an overview table of older revisions of a node.
-   *
-   * @param \Drupal\node\NodeInterface $node
-   *   A node object.
-   *
-   * @return array
-   *   An array as expected by drupal_render().
+   * {@inheritdoc}
    */
   public function revisionOverview(NodeInterface $node) {
     $languages = $node->getTranslationLanguages();
@@ -108,10 +115,28 @@ class DraftController extends NodeController {
     );
   }
 
+  /**
+   * Retreive the table headers for the revision overview page.
+   *
+   * @return array
+   *  An array of headers to be used as the '#header' for theme_table().
+   */
   protected function getRevisionHeaders() {
     return array($this->t('Revision'), $this->t('State'), $this->t('Operations'));
   }
 
+  /**
+   * Retreive the table rows for the revision overview page.
+   *
+   * @param NodeInterface $node
+   *   The node for which to retrieve the revision row.
+   * @param string $langcode
+   *   The language code of the translation to get or
+   *   LanguageInterface::LANGCODE_DEFAULT to get the data in default language.
+   *
+   * @return array
+   *   A render array for each row of the revision overview table.
+   */
   protected function getRevisionRows(NodeInterface $node, $langcode) {
     $rows = array();
     $account = $this->currentUser();
@@ -124,7 +149,18 @@ class DraftController extends NodeController {
     return $rows;
   }
 
-  protected function setRevisionPermissions(NodeInterface $node, $account) {
+  /**
+   * Set the current user permissions for the user viewing the revision table.
+   *
+   * @param NodeInterface $node
+   *   The node for which to retrieve the revision row.
+   * @param AccountProxyInterface $account
+   *   The user object for which to check and set the revision permissions.
+   *
+   * @return array
+   *   An array that contains the specified users access for 'revert' and 'delete'.
+   */
+  protected function setRevisionPermissions(NodeInterface $node, AccountProxyInterface $account) {
     $type = $node->getType();
     $this->revisionPermissions = array(
       'revert' => (($account->hasPermission("revert $type revisions") || $account->hasPermission('revert all revisions') || $account->hasPermission('administer nodes')) && $node->access('update')),
@@ -132,6 +168,20 @@ class DraftController extends NodeController {
     );
   }
 
+  /**
+   * Retrieve a single revision row for the revisions overview table.
+   *
+   * @param NodeInterface $node
+   *   The node for which to retrieve the revision row.
+   * @param integer $vid
+   *   The current revision id for which to retrieve the revision row.
+   * @param string $langcode
+   *   The language code of the translation to get or
+   *   LanguageInterface::LANGCODE_DEFAULT to get the data in default language.
+   *
+   * @param array
+   *   A render array with each column of the revision row.
+   */
   protected function getRevisionRow(NodeInterface $node, $vid, $langcode) {
     $row = [];
     /** @var \Drupal\node\NodeInterface $revision */
@@ -145,7 +195,16 @@ class DraftController extends NodeController {
     return $row;
   }
 
-  protected function getRevisionRowClass($revision) {
+  /**
+   * Retreive the row class for the specified revision.
+   *
+   * @param NodeInterface $revision
+   *   The revision for which to retrieve the revision row class.
+   *
+   * @return array
+   *   The class to append to the revision row.
+   */
+  protected function getRevisionRowClass(NodeInterface $revision) {
     $row_class = [];
     if ($this->draftRevision === $revision->getRevisionID()) {
       $row_class = ['class' => 'revision-current'];
@@ -156,7 +215,19 @@ class DraftController extends NodeController {
     return $row_class;
   }
 
-  protected function getRevisionColumnRevision($revision, $node) {
+  /**
+   * Retrieve the revision column content for the specified revision.
+   *
+   * @param NodeInterface $revision
+   *   The revision for which to retrieve the revision column content.
+   * @param NodeInterface $node
+   *   The node for which to retrieve the revision column content.
+   *
+   * @return array
+   *   The render array that contains the revision column content for the
+   *   revision row.
+   */
+  protected function getRevisionColumnRevision(NodeInterface $revision, NodeInterface $node) {
     $username = [
       '#theme' => 'username',
       '#account' => $revision->getRevisionAuthor(),
@@ -177,7 +248,21 @@ class DraftController extends NodeController {
     return $column;
   }
 
-  protected function buildRevisionColumnRevision($revision, $link, $username) {
+  /**
+   * Build the revision column content for the specified revision.
+   *
+   * @param NodeInterface $revision
+   *   The revision for which to retrieve the revision column content.
+   * @param string $link
+   *   The date link for the revision.
+   * @param array $username
+   *   The render array for the author of the revision.
+   *
+   * @return array
+   *   The render array that contains the revision column content for the
+   *   revision row.
+   */
+  protected function buildRevisionColumnRevision(NodeInterface $revision, $link, $username) {
     return [
       'data' => [
         '#type' => 'inline_template',
@@ -191,7 +276,17 @@ class DraftController extends NodeController {
     ];
   }
 
-  protected function getRevisionColumnStatus($revision) {
+  /**
+   * Retrieve the status column content for the specified revision.
+   *
+   * @param NodeInterface $revision
+   *   The revision for which to retrieve the status column content.
+   *
+   * @return array
+   *   The render array that contains the status column content for the
+   *   revision row.
+   */
+  protected function getRevisionColumnStatus(NodeInterface $revision) {
     if ($this->draftRevision === $revision->getRevisionID()) {
       $text = $this->t('Draft');
     }
@@ -209,9 +304,23 @@ class DraftController extends NodeController {
     ];
   }
 
-  protected function getRevisionColumnOperations($revision, $node, $langcode) {
+  /**
+   * Retrieve the operations column content for the specified revision.
+   *
+   * @param NodeInterface $revision
+   *   The revision for which to retrieve the operations column content.
+   * @param NodeInterface $node
+   *   The node for which to retrieve the operations column content.
+   * @param string $langcode
+   *   The language code of the translation to get or
+   *   LanguageInterface::LANGCODE_DEFAULT to get the data in default language.
+   *
+   * @return array
+   *   The render array that contains the status column content for the
+   *   revision row.
+   */
+  protected function getRevisionColumnOperations(NodeInterface $revision, NodeInterface $node, $langcode) {
     $vid = $revision->getRevisionId();
-    $column = array();
 
     $links = [];
     if ($vid === $this->draftRevision || (!$this->draftRevision && $vid === $node->getRevisionId())) {
@@ -233,14 +342,37 @@ class DraftController extends NodeController {
     return $column;
   }
 
-  protected function buildREvisionColumnOperationEdit($node) {
+  /**
+   * Build the edit operations link for the specified revision.
+   *
+   * @param NodeInterface $node
+   *   The node for which to build the edit operation link.
+   *
+   * @return array
+   *   The render array contents for the edit link operation.
+   */
+  protected function buildREvisionColumnOperationEdit(NodeInterface $node) {
     return [
       'title' => $this->t('Edit'),
       'url' => Url::fromRoute('entity.node.edit_form', ['node' => $node->id()]),
     ];
   }
 
-  protected function buildRevisionColumnOperationsRevert($revision, $node, $langcode) {
+  /**
+   * Build the revert operations link for the specified revision.
+   *
+   * @param NodeInterface $revision
+   *   The revision for which to build the revert operation link.
+   * @param NodeInterface $node
+   *   The node for which to build the revert operation link.
+   * @param string $langcode
+   *   The language code of the translation to get or
+   *   LanguageInterface::LANGCODE_DEFAULT to get the data in default language.
+   *
+   * @return array
+   *   The render array contents for the revert link operation.
+   */
+  protected function buildRevisionColumnOperationsRevert(NodeInterface $revision, NodeInterface $node, $langcode) {
     return [
       'title' => $this->t('Set as draft'),
       'url' => $this->hasTranslations ?
@@ -249,7 +381,21 @@ class DraftController extends NodeController {
     ];
   }
 
-  protected function buildRevisionColumnOperationsDelete($revision, $node, $langcode) {
+  /**
+   * Build the revert operations link for the specified revision.
+   *
+   * @param NodeInterface $revision
+   *   The revision for which to build the delete operation link.
+   * @param NodeInterface $node
+   *   The node for which to build the delete operation link.
+   * @param string $langcode
+   *   The language code of the translation to get or
+   *   LanguageInterface::LANGCODE_DEFAULT to get the data in default language.
+   *
+   * @return array
+   *   The render array contents for the delete link operation.
+   */
+  protected function buildRevisionColumnOperationsDelete(NodeInterface $revision, NodeInterface $node, $langcode) {
     return [
       'title' => $this->t('Delete'),
       'url' => Url::fromRoute('node.revision_delete_confirm', ['node' => $node->id(), 'node_revision' => $revision->getRevisionId()]),
