@@ -1,7 +1,7 @@
 services:
   access_check.node.draft:
     class: Drupal\moderation\Access\DraftAccess
-    arguments: ['@entity.manager','@moderation.node_moderation']
+    arguments: ['@entity.manager','@moderation.node_moderation', '@access_check.node.revision']
     tags:
       - { name: access_check, applies_to: _access_node_draft }
   moderation.node_moderation:

@@ -13,7 +13,7 @@ interface ModerationInterface {
   /**
    * Retrieve the active draft id of the entity.
    *
-   * @param Drupal\Core\Entity\RevisionableInterface $entity
+   * @param \Drupal\Core\Entity\RevisionableInterface $entity
    *   The revisionable entity object.
    *
    * @return boolean
@@ -24,7 +24,7 @@ interface ModerationInterface {
   /**
    * Retrieve the active draft id of the entity.
    *
-   * @param Drupal\Core\Entity\RevisionableInterface $entity
+   * @param \Drupal\Core\Entity\RevisionableInterface $entity
    *   The revisionable entity object.
    *
    * @return boolean

@@ -11,6 +11,7 @@ use Drupal\Core\Access\AccessResult;
 use Drupal\Core\Entity\EntityManagerInterface;
 use Drupal\Core\Routing\Access\AccessInterface;
 use Drupal\Core\Session\AccountInterface;
+use Drupal\node\Access\NodeRevisionAccessCheck;
 use Drupal\node\NodeInterface;
 use Symfony\Component\Routing\Route;
 
@@ -42,31 +43,38 @@ class DraftAccess implements AccessInterface {
    */
   protected $moderation;
 
+
+  /**
+   * The revision access check service.
+   *
+   * @var \Drupal\node\Access\NodeRevisionAccessCheck
+   */
+  protected $revision_access_handler;
+
   /**
    * Constructs a new DraftAccess.
    *
    * @param \Drupal\Core\Entity\EntityManagerInterface
    *   The entity manager.
    */
-  public function __construct(EntityManagerInterface $entity_manager, ModerationInterface $moderation) {
+  public function __construct(EntityManagerInterface $entity_manager, ModerationInterface $moderation, NodeRevisionAccessCheck $revision_access_handler) {
     $this->nodeStorage = $entity_manager->getStorage('node');
     $this->nodeAccess = $entity_manager->getAccessControlHandler('node');
     $this->moderation = $moderation;
+    $this->revision_access_handler = $revision_access_handler;
   }
 
   /**
    * {@inheritdoc}
    */
   public function access(Route $route, AccountInterface $account, NodeInterface $node = NULL) {
-    $access_control_handler = \Drupal::service('access_check.node.revision');
-
     if ($draft_revision = $this->moderation->getDraftRevisionId($node)) {
       $node = $this->nodeStorage->loadRevision($draft_revision);
     }
 
-    // Check that the user has the ability to update the node, and that the node
-    // has a draft.
-    return AccessResult::allowedIf($access_control_handler->checkAccess($node, $account, 'view') && (boolean) $draft_revision)->addCacheableDependency($node);
+    return AccessResult::allowedIf((boolean) $draft_revision)
+      ->andIf(AccessResult::allowedIf($this->revision_access_handler->checkAccess($node, $account, 'view')))
+      ->cachePerUser()
+      ->addCacheableDependency($node);
   }
-
 }
