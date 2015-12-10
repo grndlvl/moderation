@@ -72,8 +72,9 @@ class DraftAccess implements AccessInterface {
       $node = $this->nodeStorage->loadRevision($draft_revision);
     }
 
+    $operation = $route->getRequirement('_access_node_revision');
     return AccessResult::allowedIf((boolean) $draft_revision)
-      ->andIf(AccessResult::allowedIf($this->revision_access_handler->checkAccess($node, $account, 'view')))
+      ->andIf(AccessResult::allowedIf($this->revision_access_handler->checkAccess($node, $account, $operation)))
       ->cachePerUser()
       ->addCacheableDependency($node);
   }
