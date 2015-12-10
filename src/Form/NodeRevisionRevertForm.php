@@ -28,18 +28,4 @@ class NodeRevisionRevertForm extends FormBase {
     return $revision;
   }
 
-  /**
-   * {@inheritdoc}
-   */
-  public function getConfirmText() {
-    return $this->t('Set as draft');
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function getQuestion() {
-    return t('Are you sure you want to set the revision from %revision-date as draft?', ['%revision-date' => $this->dateFormatter->format($this->revision->getRevisionCreationTime())]);
-  }
-
 }

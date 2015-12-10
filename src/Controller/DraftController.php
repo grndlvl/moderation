@@ -374,7 +374,7 @@ class DraftController extends NodeController {
    */
   protected function buildRevisionColumnOperationsRevert(NodeInterface $revision, NodeInterface $node, $langcode) {
     return [
-      'title' => $this->t('Set as draft'),
+      'title' => $this->t('Revert'),
       'url' => $this->hasTranslations ?
         Url::fromRoute('node.revision_revert_translation_confirm', ['node' => $node->id(), 'node_revision' => $revision->getRevisionId(), 'langcode' => $langcode]) :
         Url::fromRoute('node.revision_revert_confirm', ['node' => $node->id(), 'node_revision' => $revision->getRevisionId()]),
