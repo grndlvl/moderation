@@ -37,7 +37,7 @@ class NodeRevisionAccessCheck extends NodeRevisionAccessCheckBase {
    * {@inheritdoc}
    */
   public function checkAccess(NodeInterface $node, AccountInterface $account, $op = 'view') {
-    if ($op === 'update') {
+    if ($op === 'update' && $op === 'delete') {
       $this->checkModerationAccess($node, $account, $op);
     }
 

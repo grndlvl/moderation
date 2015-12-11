@@ -32,6 +32,10 @@ class RouteSubscriber extends RouteSubscriberBase {
       $this->setRevisionAccessRequirements($route);
     }
     if ($route = $collection->get('node.revision_delete_confirm')) {
+      $route->setDefaults(array(
+        '_form' => '\Drupal\moderation\Form\NodeRevisionDeleteForm',
+      ));
+
       $this->setRevisionAccessRequirements($route);
     }
   }
