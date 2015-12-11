@@ -287,6 +287,8 @@ class DraftController extends NodeController {
    *   revision row.
    */
   protected function getRevisionColumnStatus(NodeInterface $revision) {
+    $text = '';
+
     if ($this->draftRevision === $revision->getRevisionID()) {
       $text = $this->t('Draft');
     }
