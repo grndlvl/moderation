@@ -4,6 +4,11 @@ services:
     arguments: ['@entity.manager','@moderation.node_moderation', '@access_check.node.revision']
     tags:
       - { name: access_check, applies_to: _access_node_draft }
+  access_check.moderation.node.revision:
+    class: Drupal\moderation\Access\NodeRevisionAccessCheck
+    arguments: ['@entity.manager']
+    tags:
+      - { name: access_check, applies_to: _access_moderation_node_revision }
   moderation.node_moderation:
     class: Drupal\moderation\NodeModeration
     arguments: ['@entity_type.manager']

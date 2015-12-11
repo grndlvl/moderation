@@ -172,5 +172,23 @@ class ModerationNodeTest extends NodeTestBase {
     $this->assertResponse(403, 'Access is denied for the draft page for users without update access.');
   }
 
+  public function testRevertRevision() {
+    $this->drupalLogin($this->adminUser);
+
+    $inital = [
+      'title[0][value]' => $this->randomMachineName(8),
+      'body[0][value]' => $this->randomMachineName(16),
+    ];
+    $this->drupalPostForm('node/add/article', $inital, t('Save and publish'));
+
+    $node = $this->drupalGetNodeByTitle($inital['title[0][value]']);
+    $draft = [
+      'title[0][value]' => $this->randomMachineName(8),
+      'body[0][value]' => $this->randomMachineName(16),
+    ];
+    $this->drupalPostForm('node/' . $node->id() . '/edit', $draft, t('Save as draft'));
+
+    $this->drupalPostForm("node/{$node->id()}/revisions/{$node->getRevisionId()}/revert", array(), t('Revert'));
+  }
 }
 

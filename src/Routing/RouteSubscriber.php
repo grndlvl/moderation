@@ -26,9 +26,25 @@ class RouteSubscriber extends RouteSubscriberBase {
     }
     if ($route = $collection->get('node.revision_revert_confirm')) {
       $route->setDefaults(array(
-        '_form' => '\Drupal\moderation\Form\NodeRevisionRevertForm'
+        '_form' => '\Drupal\moderation\Form\NodeRevisionRevertForm',
       ));
+
+      $this->setRevisionAccessRequirements($route);
     }
+    if ($route = $collection->get('node.revision_delete_confirm')) {
+      $this->setRevisionAccessRequirements($route);
+    }
+  }
+
+  protected function setRevisionAccessRequirements(&$route) {
+    $requirements = $route->getRequirements();
+    if (isset($requirements['_access_node_revision'])) {
+      $requirements['_access_moderation_node_revision'] = $requirements['_access_node_revision'];
+      unset($requirements['_access_node_revision']);
+    }
+    $route->setRequirements($requirements);
+
+    return $this;
   }
 
 }
